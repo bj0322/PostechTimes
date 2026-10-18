@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>포항공대신문 뉴스 앱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700;900&family=Noto+Sans+KR:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a150d; }
+  body { font-family: 'Noto Sans KR', system-ui, sans-serif; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-thumb { background: rgba(200,180,140,0.25); border-radius: 2px; }
+  button { font-family: inherit; }
+  input, textarea { font-family: inherit; }
+  /* Disable text selection on buttons */
+  button { user-select: none; -webkit-tap-highlight-color: transparent; }
+  /* dc override */
+  .dc-canvas { background: #1a150d !important; }
+</style>
+
+<!-- React + Babel (pinned) -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+  integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+  crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+  integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+  crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+  integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+  crossorigin="anonymous"></script>
+
+<!-- Data + Theme (plain JS) -->
+<script src="data.js"></script>
+<script src="theme.js"></script>
+
+<!-- Components (Babel/JSX) -->
+<script type="text/babel" src="common.jsx"></script>
+<script type="text/babel" src="feeds.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+</head>
+
+<body>
+<div id="root" style="width:100%;height:100%;"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+const TH = window.POSTECH_THEME;
+const PHONE_W = 360;
+const PHONE_H = 720;
+
+// ── Label chip above each artboard ──────────────────────────
+function StyleLabel({ text, sub, color }) {
+  return (
+    <div style={{
+      textAlign: 'center', padding: '0 0 12px',
+      fontFamily: window.POSTECH_FONTS.sans,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#E8D9BB', letterSpacing: -0.2 }}>{text}</div>
+      {sub && <div style={{ fontSize: 10.5, color: '#8A7A5C', letterSpacing: 0.3, marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+// ── Mini phone frame (scaled wrapper for canvas artboard) ────
+function MiniPhone({ children, dark }) {
+  const t = dark ? TH.dark : TH.light;
+  return (
+    <PhoneShell t={t} width={PHONE_W} height={PHONE_H} dark={dark}>
+      {children}
+    </PhoneShell>
+  );
+}
+
+// ── Standalone feed artboard (no routing, just the feed) ─────
+function FeedArtboard({ style, dark, initDark }) {
+  const [isDark, setIsDark] = useState(initDark || false);
+  const t = isDark ? TH.dark : TH.light;
+  const { ARTICLES } = window.POSTECH_DATA;
+
+  const [article, setArticle] = useState(null);
+  const [bm, setBm] = useState(new Set(ARTICLES.filter(a => a.bookmarked).map(a => a.id)));
+  const [tab, setTab] = useState('home');
+
+  const toggleBm = id => setBm(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const FMap = { classic: FeedClassic, magazine: FeedMagazine, minimal: FeedMinimal, mixed: FeedMixed };
+  const FC = FMap[style];
+  const feedProps = { t, articles: ARTICLES, onOpenArticle: setArticle, dark: isDark, onToggleDark: () => setIsDark(d => !d) };
+
+  const renderScreen = () => {
+    if (article) return <ArticleScreen t={t} article={article} onBack={() => setArticle(null)} dark={isDark} onToggleDark={() => setIsDark(d => !d)} bookmarks={bm} onToggleBookmark={toggleBm} />;
+    if (tab === 'home')     return <FC {...feedProps} />;
+    if (tab === 'category') return <CategoryScreen t={t} articles={ARTICLES} onOpenArticle={setArticle} dark={isDark} onToggleDark={() => setIsDark(d => !d)} />;
+    if (tab === 'search')   return <SearchScreen t={t} articles={ARTICLES} onOpenArticle={setArticle} dark={isDark} onToggleDark={() => setIsDark(d => !d)} />;
+    if (tab === 'bookmark') return <BookmarkScreen t={t} articles={ARTICLES} bookmarks={bm} onOpenArticle={setArticle} onToggleBookmark={toggleBm} dark={isDark} onToggleDark={() => setIsDark(d => !d)} />;
+  };
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: t.surface }}>
+      {renderScreen()}
+      {!article && <TabBar active={tab} onChange={setTab} t={t} />}
+    </div>
+  );
+}
+
+// ── Standalone screen wrappers (proper components, no IIFE hooks) ──
+function useScreenState(initDark, withBookmarks = false) {
+  const { ARTICLES } = window.POSTECH_DATA;
+  const [isDark, setIsDark] = useState(initDark);
+  const [article, setArticle] = useState(null);
+  const initBm = withBookmarks ? new Set(ARTICLES.filter(a => a.bookmarked).map(a => a.id)) : new Set();
+  const [bm, setBm] = useState(initBm);
+  const th = isDark ? TH.dark : TH.light;
+  const toggleBm = id => setBm(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleDark = () => setIsDark(d => !d);
+  return { ARTICLES, isDark, setIsDark, article, setArticle, bm, setBm, th, toggleBm, toggleDark };
+}
+
+function ArticleStandaloneScreen({ initDark }) {
+  const { ARTICLES, isDark, article, setArticle, bm, th, toggleBm, toggleDark } = useScreenState(initDark, true);
+  const defaultArticle = ARTICLES[0];
+  const shown = article || defaultArticle;
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <ArticleScreen t={th} article={shown} onBack={() => setArticle(null)} dark={isDark}
+        onToggleDark={toggleDark} bookmarks={bm} onToggleBookmark={toggleBm} />
+    </div>
+  );
+}
+
+function CategoryStandaloneScreen({ initDark }) {
+  const { ARTICLES, isDark, article, setArticle, bm, setBm, th, toggleBm, toggleDark } = useScreenState(initDark, true);
+  if (article) return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <ArticleScreen t={th} article={article} onBack={() => setArticle(null)} dark={isDark}
+        onToggleDark={toggleDark} bookmarks={bm} onToggleBookmark={toggleBm} />
+    </div>
+  );
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CategoryScreen t={th} articles={ARTICLES} onOpenArticle={setArticle} dark={isDark} onToggleDark={toggleDark} />
+      <TabBar active="category" onChange={() => {}} t={th} />
+    </div>
+  );
+}
+
+function SearchStandaloneScreen({ initDark }) {
+  const { ARTICLES, isDark, article, setArticle, bm, setBm, th, toggleBm, toggleDark } = useScreenState(initDark, false);
+  if (article) return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <ArticleScreen t={th} article={article} onBack={() => setArticle(null)} dark={isDark}
+        onToggleDark={toggleDark} bookmarks={bm} onToggleBookmark={toggleBm} />
+    </div>
+  );
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <SearchScreen t={th} articles={ARTICLES} onOpenArticle={setArticle} dark={isDark} onToggleDark={toggleDark} />
+      <TabBar active="search" onChange={() => {}} t={th} />
+    </div>
+  );
+}
+
+function BookmarkStandaloneScreen({ initDark }) {
+  const { ARTICLES, isDark, article, setArticle, bm, th, toggleBm, toggleDark } = useScreenState(initDark, true);
+  if (article) return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <ArticleScreen t={th} article={article} onBack={() => setArticle(null)} dark={isDark}
+        onToggleDark={toggleDark} bookmarks={bm} onToggleBookmark={toggleBm} />
+    </div>
+  );
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <BookmarkScreen t={th} articles={ARTICLES} bookmarks={bm} onOpenArticle={setArticle}
+        onToggleBookmark={toggleBm} dark={isDark} onToggleDark={toggleDark} />
+      <TabBar active="bookmark" onChange={() => {}} t={th} />
+    </div>
+  );
+}
+
+// ── Tweaks + Root ────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "globalDark": false,
+  "accentColor": "#8C2332",
+  "density": "comfortable"
+}/*EDITMODE-END*/;
+
+function Root() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      <DesignCanvas>
+
+        {/* ═══════════════════════════════════════════════
+            SECTION 1: 메인 피드 스타일 4가지 비교
+        ═══════════════════════════════════════════════ */}
+        <DCSection id="feed-styles" title="메인 피드 스타일" subtitle="같은 기사, 4가지 편집 시각">
+
+          {/* A: Editorial Classic */}
+          <DCArtboard id="feed-classic" label="A · 신문 에디토리얼" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="A · 신문 에디토리얼" sub="마스트헤드 + 2단 그리드" color="#8C2332" />
+            <MiniPhone dark={t.globalDark}>
+              <FeedArtboard style="classic" initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+          {/* B: Magazine Cards */}
+          <DCArtboard id="feed-magazine" label="B · 매거진 카드" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="B · 매거진 카드" sub="풀블리드 히어로 + 카테고리 탭" />
+            <MiniPhone dark={t.globalDark}>
+              <FeedArtboard style="magazine" initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+          {/* C: Minimalist */}
+          <DCArtboard id="feed-minimal" label="C · 미니멀 텍스트" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="C · 미니멀 텍스트" sub="넓은 여백 + 넘버링 + 세리프" />
+            <MiniPhone dark={t.globalDark}>
+              <FeedArtboard style="minimal" initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+          {/* D: Curated Mix */}
+          <DCArtboard id="feed-mixed" label="D · 큐레이션 위젯" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="D · 큐레이션 위젯" sub="섹션 캐러셀 + 카드 피드" />
+            <MiniPhone dark={t.globalDark}>
+              <FeedArtboard style="mixed" initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+        </DCSection>
+
+        {/* ═══════════════════════════════════════════════
+            SECTION 2: 주요 화면 (A 스타일 기준)
+        ═══════════════════════════════════════════════ */}
+        <DCSection id="screens" title="주요 화면" subtitle="에디토리얼 스타일 기준 — 풀 인터랙티브">
+
+          {/* 기사 상세 — 첫 번째 기사를 기본 오픈 */}
+          <DCArtboard id="screen-article" label="기사 상세" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="기사 상세 (Article)" sub="폰트 크기 조절 · 북마크 · 공유" />
+            <MiniPhone dark={t.globalDark}>
+              <ArticleStandaloneScreen initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+          {/* 카테고리 */}
+          <DCArtboard id="screen-cat" label="섹션 브라우저" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="섹션 브라우저" sub="카테고리 필터 탭" />
+            <MiniPhone dark={t.globalDark}>
+              <CategoryStandaloneScreen initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+          {/* 검색 */}
+          <DCArtboard id="screen-search" label="검색" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="검색" sub="실시간 필터링" />
+            <MiniPhone dark={t.globalDark}>
+              <SearchStandaloneScreen initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+          {/* 스크랩 */}
+          <DCArtboard id="screen-bookmark" label="스크랩" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="스크랩 보관함" sub="북마크 관리 · 저장된 기사" />
+            <MiniPhone dark={t.globalDark}>
+              <BookmarkStandaloneScreen initDark={t.globalDark} />
+            </MiniPhone>
+          </DCArtboard>
+
+        </DCSection>
+
+        {/* ═══════════════════════════════════════════════
+            SECTION 3: 다크 모드
+        ═══════════════════════════════════════════════ */}
+        <DCSection id="dark" title="다크 모드" subtitle="따뜻한 다크 — 와인레드 + 크림 텍스트">
+
+          <DCArtboard id="dark-classic" label="에디토리얼 다크" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="A · 다크 모드" sub="따뜻한 #15120D 베이스" />
+            <MiniPhone dark>
+              <FeedArtboard style="classic" initDark />
+            </MiniPhone>
+          </DCArtboard>
+
+          <DCArtboard id="dark-magazine" label="매거진 다크" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="B · 다크 모드" />
+            <MiniPhone dark>
+              <FeedArtboard style="magazine" initDark />
+            </MiniPhone>
+          </DCArtboard>
+
+          <DCArtboard id="dark-minimal" label="미니멀 다크" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="C · 다크 모드" />
+            <MiniPhone dark>
+              <FeedArtboard style="minimal" initDark />
+            </MiniPhone>
+          </DCArtboard>
+
+          <DCArtboard id="dark-mixed" label="큐레이션 다크" width={PHONE_W} height={PHONE_H + 60}>
+            <StyleLabel text="D · 다크 모드" />
+            <MiniPhone dark>
+              <FeedArtboard style="mixed" initDark />
+            </MiniPhone>
+          </DCArtboard>
+
+        </DCSection>
+
+      </DesignCanvas>
+
+      {/* Tweaks */}
+      <TweaksPanel>
+        <TweakSection label="전역 설정" />
+        <TweakToggle label="다크 모드 (전체)" value={t.globalDark} onChange={v => setTweak('globalDark', v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>
