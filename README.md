@@ -1,6 +1,6 @@
 # PostechTimes · 포항공대신문 앱
 
-포항공대신문 기사 열람을 위한 웹·모바일 앱과 초기 디자인 시안을 함께 보관하는 프로젝트입니다. Next.js 16.2.6, React 19.2.4, TypeScript, Tailwind CSS 4, Capacitor 8을 사용합니다. 현재 package.json 버전은 0.1.0이며, Android 설정은 versionName 7.0 / versionCode 7입니다. 버전 표기가 서로 다르므로 릴리스 전에 정리해야 합니다.
+포항공대신문 기사 열람을 위한 웹·모바일 앱과 초기 디자인 시안을 함께 보관하는 프로젝트입니다. Next.js 16.2.6, React 19.2.4, TypeScript, Tailwind CSS 4, Capacitor 8을 사용합니다. 현재 버전은 2.0입니다(package.json 2.0.0, Android versionName 2.0, iOS 2.0). 빌드 번호(Android versionCode, iOS build)는 8이며, 이전에 배포된 versionCode 7 위로 업데이트되도록 버전을 올릴 때마다 1씩 늘립니다.
 
 ## 구성
 
