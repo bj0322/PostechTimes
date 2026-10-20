@@ -1,9 +1,13 @@
 name: Build Android APK
 
 # 앱을 정적 빌드하고 Capacitor로 Android 프로젝트에 반영한 뒤 테스트용(debug) APK를 만든다.
-# 결과 APK는 실행 기록 페이지의 Artifacts에서 내려받는다. Play 스토어용 release 빌드는 서명 키가 필요해 여기서 만들지 않는다.
+# PR에서는 빌드가 깨지지 않았는지 확인하고, 결과 APK는 실행 기록 페이지의 Artifacts에서 내려받는다. Play 스토어용 release 빌드는 서명 키가 필요해 여기서 만들지 않는다.
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "posttech-times-app/**"
+      - ".github/workflows/build-android-apk.yml"
   push:
     branches: [main]
     paths:
