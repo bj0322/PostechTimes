@@ -15,7 +15,7 @@
 - localStorage 기반 북마크와 10분 기사 목록 캐시
 - 라이트·다크 화면, 모바일 뒤로가기 처리
 - 네트워크 실패 또는 기사 부족 시 샘플 데이터 표시
-- 기사 화면의 AI 3줄 요약(`NEXT_PUBLIC_SUMMARY_API_URL`에 요약 서버 주소를 넣었을 때만 표시)
+- 기사 화면의 AI 3줄 요약(요약 서버 `https://posttech-times-summary.beomjoon.workers.dev`)
 
 기사 목록과 본문은 `https://times.postech.ac.kr`의 HTML을 파싱합니다. 네이티브에서는 CapacitorHttp를 우선 사용하고, 웹에서는 fetch를 사용합니다. 브라우저에서는 원본 사이트의 CORS 정책에 따라 실시간 요청이 실패하고 샘플 데이터가 표시될 수 있습니다. 사이트 HTML 구조가 바뀌면 파서 수정이 필요합니다. 검색은 현재 앱에 불러온 기사 데이터를 기준으로 하며, 별도 검색 서버나 사용자 계정 서버는 없습니다.
 
@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`을 엽니다. 앱에는 API 키를 넣지 않습니다. AI 요약을 켜려면 `.env.example`을 `.env.local`로 복사하고 요약 서버 주소를 넣습니다.
+브라우저에서 `http://localhost:3000`을 엽니다. 앱에는 API 키를 넣지 않습니다. AI 요약 서버 주소는 `.env.production`에 들어 있어 `npm run build` 결과에 자동으로 포함됩니다. 개발 서버(`npm run dev`)에서도 요약을 보려면 같은 줄을 `.env.local`에 넣습니다.
 
 ## 검사 및 웹 빌드
 
