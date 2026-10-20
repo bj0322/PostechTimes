@@ -35,25 +35,38 @@ GET /summary/{기사 번호}
 | 429 `rate_limited` | 새 요약 요청이 너무 많음. 60초 뒤 다시 시도 |
 | 502 `upstream_error` | 사이트나 Claude API 호출 실패 |
 
-## 처음 배포하기
+## 처음 배포하기 (GitHub Actions, 권장)
 
-Cloudflare 계정과 [Claude API 키](https://platform.claude.com/)가 필요합니다. 이 폴더에서 실행합니다.
+터미널 없이 GitHub 화면에서 배포합니다. `.github/workflows/deploy-summary-worker.yml`이 테스트, KV 네임스페이스 생성·연결, 배포, API 키 등록을 차례로 합니다.
+
+1. Cloudflare API 토큰을 만듭니다. 대시보드 → My Profile → API Tokens → Create Token → **Edit Cloudflare Workers** 템플릿. Account Resources와 Zone Resources는 본인 계정만 고르고, IP 필터는 비워 둡니다.
+2. Cloudflare 대시보드의 **Workers & Pages** 화면에서 **Account ID**를 복사합니다.
+3. [Claude Console](https://platform.claude.com/)에서 API 키를 만듭니다. 크레딧(결제 수단)이 있어야 요약이 만들어집니다.
+4. GitHub 저장소 → Settings → Secrets and variables → Actions에 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `ANTHROPIC_API_KEY`를 등록합니다.
+5. 이 워크플로가 main에 있어야 실행할 수 있습니다. 브랜치를 main에 합친 뒤 Actions → **Deploy summary worker** → **Run workflow**를 누릅니다. 이후에는 main의 `summary-worker/`가 바뀔 때마다 자동으로 배포됩니다.
+6. 실행 기록의 **Deploy** 단계 로그에서 `https://posttech-times-summary.<하위 도메인>.workers.dev` 주소를 확인합니다. 브라우저로 `<주소>/summary/24341`을 열어 요약 JSON이 나오는지 봅니다.
+
+그다음 앱 폴더(`posttech-times-app`)에 `.env.local`을 만들고 이 주소를 넣은 뒤 앱을 다시 빌드합니다.
+
+```
+NEXT_PUBLIC_SUMMARY_API_URL=https://posttech-times-summary.<하위 도메인>.workers.dev
+```
+
+웹으로도 앱을 배포한다면 그 주소를 `wrangler.toml`의 `ALLOWED_ORIGINS`에 추가합니다. Android·iOS 앱은 기본값에 들어 있습니다.
+
+## 내 PC에서 배포하기
+
+이 폴더에서 실행합니다. Node.js가 필요합니다.
 
 ```powershell
 npm ci
 npx wrangler login
-npx wrangler kv namespace create SUMMARIES   # 출력된 id를 wrangler.toml의 REPLACE_WITH_KV_NAMESPACE_ID 자리에 넣습니다
-npx wrangler secret put ANTHROPIC_API_KEY     # 키를 입력합니다
+npx wrangler kv namespace create posttech-times-summary   # 출력된 id를 wrangler.toml의 REPLACE_WITH_KV_NAMESPACE_ID 자리에 넣습니다
+npx wrangler secret put ANTHROPIC_API_KEY                  # 키를 입력합니다
 npm run deploy
 ```
 
-배포가 끝나면 `https://posttech-times-summary.<계정 하위 도메인>.workers.dev` 주소가 나옵니다. 앱 폴더(`posttech-times-app`)에 `.env.local`을 만들고 이 주소를 넣은 뒤 앱을 다시 빌드합니다.
-
-```
-NEXT_PUBLIC_SUMMARY_API_URL=https://posttech-times-summary.<계정 하위 도메인>.workers.dev
-```
-
-웹으로도 앱을 배포한다면 그 주소를 `wrangler.toml`의 `ALLOWED_ORIGINS`에 추가하고 다시 배포합니다. Android·iOS 앱은 기본값에 들어 있습니다.
+GitHub Actions와 같은 KV 네임스페이스를 쓰므로 둘을 섞어 써도 저장된 요약은 그대로입니다.
 
 ## 운영
 

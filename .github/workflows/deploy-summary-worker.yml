@@ -1,0 +1,56 @@
+name: Deploy summary worker
+
+# main에 summary-worker 변경이 들어오면, 또는 Actions 화면에서 수동 실행하면 요약 서버를 Cloudflare에 배포한다.
+# 저장소 Secrets에 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ANTHROPIC_API_KEY가 있어야 한다.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "summary-worker/**"
+      - ".github/workflows/deploy-summary-worker.yml"
+
+concurrency: deploy-summary-worker
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: summary-worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: summary-worker/package-lock.json
+
+      - name: Check secrets
+        run: |
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID ANTHROPIC_API_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::저장소 Secret $name이(가) 없습니다."; missing=1; fi
+          done
+          exit $missing
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Connect KV namespace
+        run: node scripts/use-kv-namespace.mjs
+
+      - name: Deploy
+        run: npx wrangler deploy
+
+      - name: Set Claude API key
+        run: printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
