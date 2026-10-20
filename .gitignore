@@ -11,6 +11,8 @@ xcuserdata/
 .env
 .env.*
 !.env.example
+.dev.vars
+.wrangler/
 local.properties
 *.apk
 *.aab

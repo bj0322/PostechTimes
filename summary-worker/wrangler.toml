@@ -1,0 +1,19 @@
+name = "posttech-times-summary"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 요약 API를 호출할 수 있는 웹 출처(쉼표로 구분). Android 앱은 https://localhost, iOS 앱은 capacitor://localhost입니다.
+# 웹으로 배포하는 주소가 생기면 여기에 추가합니다.
+ALLOWED_ORIGINS = "https://localhost,capacitor://localhost,http://localhost:3000"
+
+# `npx wrangler kv namespace create SUMMARIES`가 출력한 id로 바꿉니다.
+[[kv_namespaces]]
+binding = "SUMMARIES"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# 저장된 요약이 없어 새로 만들어야 하는 요청만 IP당 1분에 10회로 제한합니다.
+[[ratelimits]]
+name = "GENERATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
