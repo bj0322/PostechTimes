@@ -5,6 +5,7 @@
 ## 구성
 
 - `posttech-times-app/`: 실제 앱 소스, 의존성 잠금 파일, Android 및 iOS 네이티브 프로젝트
+- `summary-worker/`: 기사 AI 요약 서버(Cloudflare Worker). 설정과 배포는 [summary-worker/README.md](summary-worker/README.md)를 봅니다.
 - 최상위 `*.jsx`, `data.js`, `theme.js`, `POSTECH Times.html`: 초기 디자인 시안 및 화면 실험 파일. 실제 앱의 실행 진입점과 구분합니다.
 
 ## 기능
@@ -14,6 +15,7 @@
 - localStorage 기반 북마크와 10분 기사 목록 캐시
 - 라이트·다크 화면, 모바일 뒤로가기 처리
 - 네트워크 실패 또는 기사 부족 시 샘플 데이터 표시
+- 기사 화면의 AI 3줄 요약(`NEXT_PUBLIC_SUMMARY_API_URL`에 요약 서버 주소를 넣었을 때만 표시)
 
 기사 목록과 본문은 `https://times.postech.ac.kr`의 HTML을 파싱합니다. 네이티브에서는 CapacitorHttp를 우선 사용하고, 웹에서는 fetch를 사용합니다. 브라우저에서는 원본 사이트의 CORS 정책에 따라 실시간 요청이 실패하고 샘플 데이터가 표시될 수 있습니다. 사이트 HTML 구조가 바뀌면 파서 수정이 필요합니다. 검색은 현재 앱에 불러온 기사 데이터를 기준으로 하며, 별도 검색 서버나 사용자 계정 서버는 없습니다.
 
@@ -27,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`을 엽니다. 기본 실행에 별도 API 키는 사용하지 않습니다.
+브라우저에서 `http://localhost:3000`을 엽니다. 앱에는 API 키를 넣지 않습니다. AI 요약을 켜려면 `.env.example`을 `.env.local`로 복사하고 요약 서버 주소를 넣습니다.
 
 ## 검사 및 웹 빌드
 
@@ -63,6 +65,7 @@ macOS와 Xcode가 필요합니다. 앱 폴더에서 `npm run build`, `npx cap sy
 | `src/components/` | 피드·검색·카테고리·북마크·기사 화면 |
 | `src/lib/fetchArticles.ts` | 섹션 목록·원본 HTML 파싱·캐시·본문 요청 |
 | `src/lib/articles.ts` | 샘플 기사·카테고리 데이터 |
+| `src/lib/summarize.ts`, `src/components/SummaryCard.tsx` | AI 요약 요청·캐시와 기사 화면의 요약 카드 |
 | `src/lib/theme.ts` | 테마·글꼴 |
 | `src/types/article.ts` | 기사 데이터 타입 |
 | `android/`, `ios/` | Capacitor 네이티브 소스와 프로젝트 설정 |
