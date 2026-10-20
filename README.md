@@ -1,6 +1,6 @@
 # PostechTimes · 포항공대신문 앱
 
-포항공대신문 기사 열람을 위한 웹·모바일 앱과 초기 디자인 시안을 함께 보관하는 프로젝트입니다. Next.js 16.2.6, React 19.2.4, TypeScript, Tailwind CSS 4, Capacitor 8을 사용합니다. 현재 버전은 2.0입니다(package.json 2.0.0, Android versionName 2.0, iOS 2.0). 빌드 번호(Android versionCode, iOS build)는 8이며, 이전에 배포된 versionCode 7 위로 업데이트되도록 버전을 올릴 때마다 1씩 늘립니다.
+포항공대신문 기사 열람을 위한 웹·모바일 앱과 초기 디자인 시안을 함께 보관하는 프로젝트입니다. Next.js 16.2.6, React 19.2.4, TypeScript, Tailwind CSS 4, Capacitor 8을 사용합니다. 현재 버전은 2.1입니다(package.json 2.1.0, Android versionName 2.1, iOS 2.1). 빌드 번호(Android versionCode, iOS build)는 9이며, 이전에 배포된 versionCode 7 위로 업데이트되도록 버전을 올릴 때마다 1씩 늘립니다.
 
 ## 구성
 
@@ -50,7 +50,7 @@ npx cap sync android
 npx cap open android
 ```
 
-Android Studio에서 SDK 경로를 설정하고 앱을 실행하거나 빌드합니다. Windows 명령줄 디버그 빌드는 `android` 폴더에서 `./gradlew.bat assembleDebug`를 사용합니다. 앱 ID는 `kr.ac.postech.times`입니다. `android/local.properties`는 각 PC에서 생성하며 공유하지 않습니다. 서명 키도 별도로 관리합니다.
+Android Studio에서 SDK 경로를 설정하고 앱을 실행하거나 빌드합니다. Windows 명령줄 디버그 빌드는 `android` 폴더에서 `./gradlew.bat assembleDebug`를 사용합니다. 앱 ID는 `kr.ac.postech.times`입니다. `android/local.properties`는 각 PC에서 생성하며 공유하지 않습니다. 서명 키도 별도로 관리합니다. 배포용 APK는 GitHub Actions의 **Build Android APK** 워크플로가 저장소 Secret(`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`)의 고정 키로 서명합니다. 같은 키로 서명해야 기존 설치 위에 업데이트되므로, 키 파일은 따로 백업해 두고 잃어버리지 않도록 합니다. Android Studio에서 직접 설치한 앱은 PC의 debug 키로 서명되어 배포 APK와 서로 덮어쓸 수 없습니다.
 
 ## iOS
 
