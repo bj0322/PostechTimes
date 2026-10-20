@@ -11,6 +11,7 @@ xcuserdata/
 .env
 .env.*
 !.env.example
+!posttech-times-app/.env.production
 .dev.vars
 .wrangler/
 local.properties

@@ -46,7 +46,7 @@ GET /summary/{기사 번호}
 5. 이 워크플로가 main에 있어야 실행할 수 있습니다. 브랜치를 main에 합친 뒤 Actions → **Deploy summary worker** → **Run workflow**를 누릅니다. 이후에는 main의 `summary-worker/`가 바뀔 때마다 자동으로 배포됩니다.
 6. 실행 기록의 **Deploy** 단계 로그에서 `https://posttech-times-summary.<하위 도메인>.workers.dev` 주소를 확인합니다. 브라우저로 `<주소>/summary/24341`을 열어 요약 JSON이 나오는지 봅니다.
 
-그다음 앱 폴더(`posttech-times-app`)에 `.env.local`을 만들고 이 주소를 넣은 뒤 앱을 다시 빌드합니다.
+주소가 바뀌면 앱 폴더(`posttech-times-app`)의 `.env.production`을 고치고 앱을 다시 빌드합니다. 지금 주소는 `https://posttech-times-summary.beomjoon.workers.dev`입니다.
 
 ```
 NEXT_PUBLIC_SUMMARY_API_URL=https://posttech-times-summary.<하위 도메인>.workers.dev
