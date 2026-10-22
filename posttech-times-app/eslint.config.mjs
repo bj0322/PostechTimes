@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "ios/**",
     "node_modules/**",
     "next-env.d.ts",
+    // Background Runner의 별도 JS 환경에서 도는 파일(CapacitorKV 등 전역 사용).
+    "public/runners/**",
   ]),
 ]);
 

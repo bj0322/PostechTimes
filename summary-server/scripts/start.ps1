@@ -19,6 +19,6 @@ catch { Start-Process $ollama -ArgumentList 'serve' -WindowStyle Hidden; Start-S
 New-Item -ItemType Directory -Force "$root\logs" | Out-Null
 Set-Location $root
 while ($true) {
-  & $node src/index.ts *>> "$root\logs\server.log"
+  & $node --env-file-if-exists=.env src/index.ts *>> "$root\logs\server.log"
   Start-Sleep 10
 }

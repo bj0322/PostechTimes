@@ -1,6 +1,10 @@
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { addManualAlert, alertsAfter } from './alerts.ts';
+import { apkForTag, latestApp, startUpdateCheck } from './appUpdate.ts';
 import { ArticleNotFoundError } from './article.ts';
-import { startPrefetch } from './prefetch.ts';
+import { startWatch } from './prefetch.ts';
 import { generate, isGenerating, readStored } from './store.ts';
 import { MODEL, SummaryError } from './summarize.ts';
 
@@ -46,7 +50,8 @@ function corsHeaders(req: IncomingMessage): Record<string, string> {
   if (!origin || !ALLOWED_ORIGINS.includes(origin)) return { Vary: 'Origin' };
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -57,16 +62,77 @@ function send(res: ServerResponse, body: unknown, status: number, headers: Recor
   res.end(JSON.stringify(body));
 }
 
+// 운영자용 API(속보 직접 보내기)는 이 PC에서 보낸 요청만 받는다.
+function isLoopback(req: IncomingMessage): boolean {
+  const ip = req.socket.remoteAddress ?? '';
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  let raw = '';
+  for await (const chunk of req) {
+    raw += chunk;
+    if (raw.length > 16_384) throw new Error('body too large');
+  }
+  const parsed: unknown = JSON.parse(raw || '{}');
+  return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+}
+
 const server = createServer(async (req, res) => {
   const cors = corsHeaders(req);
   if (req.method === 'OPTIONS') {
     res.writeHead(204, cors);
     return void res.end();
   }
+
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  const path = url.pathname;
+
+  if (req.method === 'POST' && path === '/admin/alerts') {
+    if (!isLoopback(req)) return send(res, { error: 'forbidden' }, 403, cors);
+    try {
+      return send(res, await addManualAlert(await readJson(req)), 201, cors);
+    } catch (err) {
+      return send(res, { error: 'bad_request', message: err instanceof Error ? err.message : String(err) }, 400, cors);
+    }
+  }
   if (req.method !== 'GET') return send(res, { error: 'method_not_allowed' }, 405, cors);
 
-  const path = new URL(req.url ?? '/', 'http://localhost').pathname;
   if (path === '/health') return send(res, { ok: true, model: MODEL }, 200, cors);
+
+  if (path === '/alerts') {
+    const after = Number(url.searchParams.get('after') ?? 0);
+    return send(res, await alertsAfter(Number.isFinite(after) ? after : 0), 200, cors);
+  }
+
+  if (path === '/app/latest') {
+    try {
+      const latest = await latestApp();
+      return latest ? send(res, latest, 200, cors) : send(res, { error: 'no_release' }, 404, cors);
+    } catch (err) {
+      console.error('app update: latest failed:', err);
+      return send(res, { error: 'upstream_error' }, 502, cors);
+    }
+  }
+
+  const tag = path.match(/^\/app\/download\/(v[\d.]+)\.apk$/)?.[1];
+  if (tag) {
+    try {
+      const file = await apkForTag(tag);
+      if (!file) return send(res, { error: 'not_found' }, 404, cors);
+      const { size } = await stat(file);
+      res.writeHead(200, {
+        ...cors,
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Length': String(size),
+        'Content-Disposition': `attachment; filename="posttech-times-${tag}.apk"`,
+      });
+      return void createReadStream(file).pipe(res);
+    } catch (err) {
+      console.error(`app update: download ${tag} failed:`, err);
+      return send(res, { error: 'upstream_error' }, 502, cors);
+    }
+  }
 
   const id = path.match(/^\/summary\/(\d{1,9})\/?$/)?.[1];
   if (!id) return send(res, { error: 'not_found' }, 404, cors);
@@ -90,5 +156,6 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`summary server on http://${HOST}:${PORT} (model ${MODEL})`);
-  startPrefetch();
+  startWatch();
+  startUpdateCheck();
 });
