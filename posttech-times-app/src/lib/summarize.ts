@@ -1,3 +1,5 @@
+import { SERVER_URL as API_URL } from './server';
+
 export interface ArticleSummary {
   id: string;
   title: string;
@@ -7,7 +9,6 @@ export interface ArticleSummary {
   createdAt: string;
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_SUMMARY_API_URL ?? '').replace(/\/+$/, '');
 const CACHE_PREFIX = 'postech_summary_v1:';
 
 // 요약 서버는 포항공대신문 기사 번호(idxno)로만 요약한다. 샘플 기사는 대상이 아니다.

@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import CapacitorBackgroundRunner
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // 속보 알림을 확인하는 백그라운드 작업(capacitor.config.ts의 BackgroundRunner)을 등록한다.
+        BackgroundRunnerPlugin.registerBackgroundTask()
+        BackgroundRunnerPlugin.handleApplicationDidFinishLaunching(launchOptions: launchOptions)
         return true
     }
 
