@@ -6,6 +6,7 @@
 
 - `posttech-times-app/`: 실제 앱 소스, 의존성 잠금 파일, Android 및 iOS 네이티브 프로젝트
 - `summary-worker/`: 기사 AI 요약 서버(Cloudflare Worker). 설정과 배포는 [summary-worker/README.md](summary-worker/README.md)를 봅니다.
+- `summary-server/`: 같은 요약 API를 직접 운영하는 서버에서 Ollama 로컬 모델로 제공하는 Node 서버. 설정은 [summary-server/README.md](summary-server/README.md)를 봅니다.
 - 최상위 `*.jsx`, `data.js`, `theme.js`, `POSTECH Times.html`: 초기 디자인 시안 및 화면 실험 파일. 실제 앱의 실행 진입점과 구분합니다.
 
 ## 기능
