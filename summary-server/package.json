@@ -1,13 +1,13 @@
 {
   "name": "posttech-times-summary-server",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "start": "node src/index.ts",
+    "start": "node --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts"
   },

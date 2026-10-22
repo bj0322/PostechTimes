@@ -10,8 +10,29 @@ import ArticleScreen from './ArticleScreen';
 import CategoryScreen from './CategoryScreen';
 import BookmarkScreen from './BookmarkScreen';
 import SearchScreen from './SearchScreen';
+import UpdateBanner from './UpdateBanner';
+import type { AppUpdate } from '@/lib/update';
+import type { AlertTarget } from '@/lib/alerts';
 
 const BOOKMARK_STORAGE_KEY = 'postech_times_bookmarks_v1';
+
+// 알림으로 연 기사는 번호와 제목만 안다. 나머지는 기사 화면이 원문에서 불러온다.
+function articleFromAlert({ articleId, title }: AlertTarget): Article {
+  return {
+    id: articleId,
+    cat: '속보',
+    catColor: 'primary',
+    kicker: '포항공대신문',
+    title,
+    sub: '',
+    author: '포항공대신문',
+    date: '',
+    readTime: '',
+    bookmarked: false,
+    hero: { hue: 8, label: '포항공대신문' },
+    url: `https://times.postech.ac.kr/news/articleView.html?idxno=${articleId}`,
+  };
+}
 
 function getInitialBookmarks() {
   const defaults = sampleArticles.filter(a => a.bookmarked).map(a => a.id);
@@ -41,6 +62,7 @@ export default function NewsApp() {
   const [nextPage, setNextPage] = useState(2);
   const [hasMore, setHasMore] = useState(true);
   const [bookmarks, setBookmarks] = useState<Set<string>>(getInitialBookmarks);
+  const [update, setUpdate] = useState<AppUpdate | null>(null);
   const articleRef = useRef<Article | null>(null);
   const tabRef = useRef<TabKey>('home');
 
@@ -119,6 +141,38 @@ export default function NewsApp() {
     }
     load();
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('@/lib/update')
+      .then(({ checkForUpdate }) => checkForUpdate())
+      .then(found => { if (!cancelled && found) setUpdate(found); })
+      .catch(() => {
+        // 업데이트 확인 실패는 다음 실행 때 다시 시도한다.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    import('@/lib/alerts')
+      .then(({ startAlerts }) => startAlerts(target => {
+        setArticle(articleFromAlert(target));
+        window.history.pushState({ screen: 'article', id: target.articleId }, '', window.location.href);
+      }))
+      .then(cleanup => {
+        if (cancelled) cleanup();
+        else stop = cleanup;
+      })
+      .catch(() => {
+        // 알림을 켜지 못해도 앱은 그대로 쓴다.
+      });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
   }, []);
 
   const toggleBookmark = (id: string) => {
@@ -273,6 +327,9 @@ export default function NewsApp() {
       {renderScreen()}
       {!article && (
         <TabBar active={tab} onChange={changeTab} t={t} />
+      )}
+      {update && !article && (
+        <UpdateBanner t={t} update={update} onDismiss={() => setUpdate(null)} />
       )}
     </div>
   );
