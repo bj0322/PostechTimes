@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 서버(summary-server)는 아직 도메인·HTTPS가 없어 IP 주소의 http로만 연결한다. 그 주소에만 평문 통신을 허용한다.
+     서버 주소를 바꾸면 posttech-times-app/.env.production의 NEXT_PUBLIC_SERVER_URL도 함께 고친다. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">141.223.176.120</domain>
+    </domain-config>
+</network-security-config>

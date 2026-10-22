@@ -1,11 +1,12 @@
 # PostechTimes · 포항공대신문 앱
 
-포항공대신문 기사 열람을 위한 웹·모바일 앱과 초기 디자인 시안을 함께 보관하는 프로젝트입니다. Next.js 16.2.6, React 19.2.4, TypeScript, Tailwind CSS 4, Capacitor 8을 사용합니다. 현재 버전은 2.1입니다(package.json 2.1.0, Android versionName 2.1, iOS 2.1). 빌드 번호(Android versionCode, iOS build)는 9이며, 이전에 배포된 versionCode 7 위로 업데이트되도록 버전을 올릴 때마다 1씩 늘립니다.
+포항공대신문 기사 열람을 위한 웹·모바일 앱과 초기 디자인 시안을 함께 보관하는 프로젝트입니다. Next.js 16.2.6, React 19.2.4, TypeScript, Tailwind CSS 4, Capacitor 8을 사용합니다. 현재 버전은 2.3입니다(package.json 2.3.0, Android versionName 2.3, iOS 2.3). 빌드 번호(Android versionCode, iOS build)는 11이며, 이전에 배포된 versionCode 위로 업데이트되도록 버전을 올릴 때마다 1씩 늘립니다.
 
 ## 구성
 
 - `posttech-times-app/`: 실제 앱 소스, 의존성 잠금 파일, Android 및 iOS 네이티브 프로젝트
-- `summary-worker/`: 기사 AI 요약 서버(Cloudflare Worker). 설정과 배포는 [summary-worker/README.md](summary-worker/README.md)를 봅니다.
+- `summary-server/`: 앱 서버(Node). AI 요약(Ollama 로컬 모델), 앱 업데이트 APK 제공, 속보 알림 목록을 직접 운영하는 PC에서 제공합니다. 설정은 [summary-server/README.md](summary-server/README.md)를 봅니다.
+- `summary-worker/`: 이전 AI 요약 서버(Cloudflare Worker). 2.3부터 앱은 `summary-server`를 씁니다.
 - 최상위 `*.jsx`, `data.js`, `theme.js`, `POSTECH Times.html`: 초기 디자인 시안 및 화면 실험 파일. 실제 앱의 실행 진입점과 구분합니다.
 
 ## 기능
@@ -15,7 +16,11 @@
 - localStorage 기반 북마크와 10분 기사 목록 캐시
 - 라이트·다크 화면, 모바일 뒤로가기 처리
 - 네트워크 실패 또는 기사 부족 시 샘플 데이터 표시
-- 기사 화면의 AI 3줄 요약(요약 서버 `https://posttech-times-summary.beomjoon.workers.dev`)
+- 기사 화면의 AI 3줄 요약
+- Android 새 버전 알림: 앱을 열 때 서버에 최신 릴리스를 묻고, 새 버전이 있으면 APK를 내려받아 설치하도록 안내
+- 속보·새 기사 알림: 백그라운드 러너(`public/runners/alerts.js`)가 약 15분마다 서버의 알림 목록을 확인해 로컬 알림을 띄움. 알림을 누르면 해당 기사를 엶
+
+세 기능은 모두 `summary-server`(현재 `http://141.223.176.120:8787`, `.env.production`의 `NEXT_PUBLIC_SERVER_URL`)를 씁니다.
 
 기사 목록과 본문은 `https://times.postech.ac.kr`의 HTML을 파싱합니다. 네이티브에서는 CapacitorHttp를 우선 사용하고, 웹에서는 fetch를 사용합니다. 브라우저에서는 원본 사이트의 CORS 정책에 따라 실시간 요청이 실패하고 샘플 데이터가 표시될 수 있습니다. 사이트 HTML 구조가 바뀌면 파서 수정이 필요합니다. 검색은 현재 앱에 불러온 기사 데이터를 기준으로 하며, 별도 검색 서버나 사용자 계정 서버는 없습니다.
 
@@ -29,7 +34,7 @@ npm ci
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`을 엽니다. 앱에는 API 키를 넣지 않습니다. AI 요약 서버 주소는 `.env.production`에 들어 있어 `npm run build` 결과에 자동으로 포함됩니다. 개발 서버(`npm run dev`)에서도 요약을 보려면 같은 줄을 `.env.local`에 넣습니다.
+브라우저에서 `http://localhost:3000`을 엽니다. 앱에는 API 키를 넣지 않습니다. 서버 주소는 `.env.production`에 들어 있어 `npm run build` 결과에 자동으로 포함됩니다. 개발 서버(`npm run dev`)에서도 요약을 보려면 같은 줄을 `.env.local`에 넣습니다. 업데이트 확인과 알림은 네이티브 앱에서만 동작합니다.
 
 ## 검사 및 웹 빌드
 

@@ -47,5 +47,21 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- 서버(summary-server)가 아직 IP 주소의 http로만 열려 있다. ATS는 IP 주소별 예외를 받지 않아 전체를 허용한다.
+		     서버에 HTTPS 도메인이 생기면 이 항목을 지운다. -->
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>kr.ac.postech.times.alerts</string>
+	</array>
 </dict>
 </plist>
