@@ -35,3 +35,10 @@ posttech-times-app/android/capacitor-cordova-android-plugins/
 posttech-times-app/ios/App/App/public/
 posttech-times-app/ios/App/App/capacitor.config.json
 posttech-times-app/ios/capacitor-cordova-ios-plugins/
+
+# 기사 보관소 이어받기 상태(커밋하지 않음)
+data/.backfill_state.json
+data/.raw_articles.json
+data/*.tmp
+data/**/*.tmp
+__pycache__/
