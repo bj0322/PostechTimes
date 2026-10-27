@@ -14,7 +14,25 @@ python3 tools/archive/ptimes_archive.py backfill
 - 403/429를 받으면 바로 멈춥니다. 30분~몇 시간 뒤 **같은 명령**을 다시 실행하면 이어서 받습니다.
 - 끝나면 `data/`의 변경을 커밋합니다.
 
-## 새 호가 나올 때마다
+## 자동으로: 사이트가 바뀌었을 때만 갱신 (권장)
+
+```sh
+python3 tools/archive/ptimes_archive.py watch              # 10분마다 확인, 계속 실행
+python3 tools/archive/ptimes_archive.py watch --once       # 한 번만 확인(cron·작업 스케줄러용)
+```
+
+사이트의 RSS 전체기사 피드(`/rss/allArticle.xml`)는 정적 파일이라 `ETag`·`Last-Modified`가 붙고, 기사가 올라오거나 고쳐지면 바뀝니다(피드 안 `lastBuildDate`와 같은 값). 지난번 값을 같이 보내는 조건부 GET을 쓰므로, 바뀌지 않았으면 서버가 본문 없이 **304**만 돌려줍니다. 바뀌었을 때만 `update`를 돌립니다.
+
+| | 요청 |
+|---|---|
+| 섹션 17개 첫 쪽을 5분마다 긁기 | 시간당 전체 페이지 약 200개 |
+| `watch` (10분 간격) | 시간당 304 응답 6개(각 수백 바이트) + 호가 올라오는 날만 목록 몇 쪽 |
+
+피드 내용은 신호로만 씁니다. 호를 올리는 날은 한 시간에 40건 가까이 올라와 피드 창(최근 수십 건)을 넘길 수 있으므로, 새 기사는 목록 페이지에서 이미 아는 기사가 나올 때까지 읽습니다.
+
+> 사이트 보안 장치는 **HEAD 요청**을 오류 페이지(`se-cu.com/ndsoft/error.html`)로 302 리디렉션합니다. 이 도구는 GET만 쓰고, 오류 페이지로 돌려보내지면 차단으로 보고 멈춥니다(`watch`는 한 시간 쉰 뒤 다시 확인).
+
+## 손으로: 새 호가 나올 때마다
 
 ```sh
 python3 tools/archive/ptimes_archive.py update

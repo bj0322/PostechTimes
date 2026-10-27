@@ -8,9 +8,11 @@
     python3 tools/archive/ptimes_archive.py backfill   # 처음 한 번: 전체 기사 목록을 천천히 받아 보관
     python3 tools/archive/ptimes_archive.py update     # 새 호가 나올 때마다: 새 기사만 받아 추가
     python3 tools/archive/ptimes_archive.py build      # 네트워크 없이 data/articles.json에서 호 파일만 다시 만들기
+    python3 tools/archive/ptimes_archive.py watch      # 사이트가 바뀌었을 때만 update (RSS 조건부 요청, 평소엔 304)
 
 서버 예절
-    - 요청 사이 1.5초 이상 쉬고(--delay), 403/429를 받으면 즉시 멈춥니다(방화벽 차단 방지).
+    - GET만 씁니다. HEAD는 사이트 보안 장치가 오류 페이지로 돌려보냅니다.
+    - 요청 사이 1.5초 이상 쉬고(--delay), 403/429나 오류 페이지 리디렉션을 받으면 즉시 멈춥니다(방화벽 차단 방지).
     - backfill은 중간에 멈춰도 같은 명령으로 이어서 받습니다(data/.backfill_state.json).
 
 표준 라이브러리만 씁니다(Python 3.10+).
@@ -46,29 +48,56 @@ class Blocked(Exception):
     pass
 
 
+USER_AGENT = "PostechTimesArchive/1.0 (+https://github.com/bj0322/postechtimes)"
+BLOCKED_HINT = "한참 뒤(30분~몇 시간) 같은 명령으로 이어서 받으세요."
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """사이트 보안 장치는 거절할 때 403 대신 302로 오류 페이지(se-cu.com/ndsoft/error.html)로 보냅니다.
+    리디렉션을 따라가면 오류 페이지를 '기사 0건'으로 잘못 읽으므로, 따라가지 않고 직접 판단합니다."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirect)
+
+
 class Fetcher:
+    """GET만 씁니다(HEAD는 사이트 보안 장치가 막습니다). 요청 사이 delay초 이상 쉽니다."""
+
     def __init__(self, delay: float):
         self.delay = delay
         self.last = 0.0
         self.count = 0
 
-    def get(self, path: str, query: dict[str, str] | None = None) -> str:
+    def request(self, path: str, query: dict[str, str] | None = None,
+                headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], bytes]:
         wait = self.delay - (time.monotonic() - self.last)
         if wait > 0:
             time.sleep(wait)
         url = BASE + path + ("?" + urllib.parse.urlencode(query) if query else "")
-        req = urllib.request.Request(url, headers={"Accept-Language": "ko-KR,ko;q=0.9"})
+        req = urllib.request.Request(url, headers={
+            "Accept-Language": "ko-KR,ko;q=0.9", "User-Agent": USER_AGENT, **(headers or {}),
+        })
         try:
-            with urllib.request.urlopen(req, timeout=30) as res:
-                body = res.read().decode("utf-8", errors="replace")
+            with _opener.open(req, timeout=30) as res:
+                return res.status, dict(res.headers), res.read()
         except urllib.error.HTTPError as e:
+            if e.code == 304:
+                return 304, dict(e.headers), b""
             if e.code in (403, 429):
-                raise Blocked(f"서버가 {e.code}로 거절했습니다. 한참 뒤(30분~몇 시간) 같은 명령으로 이어서 받으세요.") from e
+                raise Blocked(f"서버가 {e.code}로 거절했습니다. {BLOCKED_HINT}") from e
+            if 300 <= e.code < 400:
+                where = e.headers.get("Location", "")
+                raise Blocked(f"서버가 오류 페이지로 돌려보냈습니다({e.code} → {where}). {BLOCKED_HINT}") from e
             raise
         finally:
             self.last = time.monotonic()
             self.count += 1
-        return body
+
+    def get(self, path: str, query: dict[str, str] | None = None) -> str:
+        _, _, body = self.request(path, query)
+        return body.decode("utf-8", errors="replace")
 
 
 # ─────────────────────────────── HTML 파싱 (앱의 PageParsers.swift와 같은 규칙)
@@ -382,6 +411,48 @@ def cmd_update(args) -> None:
     print(f"새 기사 {len(new)}건 추가. data/ 의 변경을 확인하고 커밋하세요.")
 
 
+def rss_changed(fetcher: Fetcher, state: dict) -> bool:
+    """RSS 전체기사 피드는 정적 파일이라 ETag·Last-Modified가 붙습니다. 지난번 값을 함께 보내면
+    바뀌지 않았을 때 서버가 본문 없이 304만 돌려줍니다(요청 하나에 수백 바이트).
+    피드 내용은 신호로만 씁니다 — 호를 올리는 날은 피드 창(최근 수십 건)을 넘길 만큼 기사가 올라옵니다."""
+    headers = {}
+    if state.get("etag"):
+        headers["If-None-Match"] = state["etag"]
+    if state.get("lastModified"):
+        headers["If-Modified-Since"] = state["lastModified"]
+    status, res_headers, _ = fetcher.request("/rss/allArticle.xml", headers=headers)
+    if status == 304:
+        return False
+    changed = (res_headers.get("ETag"), res_headers.get("Last-Modified")) != (state.get("etag"), state.get("lastModified"))
+    state["etag"], state["lastModified"] = res_headers.get("ETag"), res_headers.get("Last-Modified")
+    return changed
+
+
+def cmd_watch(args) -> None:
+    """사이트가 바뀌었을 때만 update를 돌립니다. --once는 한 번만 확인(cron·작업 스케줄러용)."""
+    fetcher = Fetcher(args.delay)
+    state_path = DATA / ".watch_state.json"
+    state = load_json(state_path, {})
+    while True:
+        stamp = dt.datetime.now(KST).strftime("%m-%d %H:%M")
+        try:
+            if rss_changed(fetcher, state):
+                print(f"[{stamp}] 사이트가 바뀌었습니다(Last-Modified {state.get('lastModified')}). 새 기사를 확인합니다.")
+                save_json(state_path, state)
+                cmd_update(argparse.Namespace(delay=args.delay, max_pages=args.max_pages))
+            else:
+                print(f"[{stamp}] 변경 없음")
+        except Blocked as e:
+            print(f"[{stamp}] {e}", file=sys.stderr)
+            if args.once:
+                sys.exit(2)
+            time.sleep(60 * 60)        # 차단 중에는 한 시간 동안 아무 요청도 보내지 않습니다
+            continue
+        if args.once:
+            return
+        time.sleep(args.interval * 60)
+
+
 def cmd_build(args) -> None:
     finish(None, load_json(DATA / "articles.json", []), load_json(DATA / "categories.json", {}), fetch_bodies=False)
 
@@ -413,8 +484,13 @@ def main() -> None:
     u.add_argument("--delay", type=float, default=1.5)
     u.add_argument("--max-pages", type=int, default=10)
     sub.add_parser("build", help="네트워크 없이 호 파일 다시 만들기")
+    w = sub.add_parser("watch", help="사이트가 바뀌었을 때만 update(RSS 조건부 요청으로 확인)")
+    w.add_argument("--interval", type=float, default=10, help="확인 간격(분)")
+    w.add_argument("--once", action="store_true", help="한 번만 확인하고 끝내기")
+    w.add_argument("--delay", type=float, default=1.5)
+    w.add_argument("--max-pages", type=int, default=10)
     args = p.parse_args()
-    {"backfill": cmd_backfill, "update": cmd_update, "build": cmd_build}[args.cmd](args)
+    {"backfill": cmd_backfill, "update": cmd_update, "build": cmd_build, "watch": cmd_watch}[args.cmd](args)
 
 
 if __name__ == "__main__":

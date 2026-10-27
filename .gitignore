@@ -42,3 +42,4 @@ data/.raw_articles.json
 data/*.tmp
 data/**/*.tmp
 __pycache__/
+data/.watch_state.json
