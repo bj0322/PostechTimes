@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { recordArticles, type ListedArticle } from './alerts.ts';
 import { generate, readStored } from './store.ts';
+import { checkFeed, SiteBlockedError, type Validators } from './feed.ts';
 
 const BASE = 'https://times.postech.ac.kr';
 
@@ -14,10 +15,16 @@ const SECTIONS: [code: string, label: string][] = [
 
 const PER_SECTION = Number(process.env.PREFETCH_PER_SECTION ?? 5);
 const INTERVAL_MS = Number(process.env.WATCH_INTERVAL_MIN ?? 5) * 60_000;
+// 사이트 보안 장치에 막히면(403·429·오류 페이지 리디렉션) 이 시간 동안 사이트에 아무 요청도 보내지 않는다.
+const BLOCK_PAUSE_MS = Number(process.env.BLOCK_PAUSE_MIN ?? 60) * 60_000;
 
 async function listSection(code: string, label: string): Promise<ListedArticle[]> {
   const url = `${BASE}/news/articleList.html?sc_section_code=${code}&view_type=sm&page=1`;
-  const res = await fetch(url, { headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(15_000) });
+  // 리디렉션을 따라가면 보안 장치의 오류 페이지를 '기사 0건'으로 읽는다. 따라가지 않고 차단으로 본다.
+  const res = await fetch(url, { headers: { Accept: 'text/html' }, redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+  if ((res.status >= 300 && res.status < 400) || res.status === 403 || res.status === 429) {
+    throw new SiteBlockedError(`listing ${code}: ${res.status} ${res.headers.get('location') ?? ''}`.trim());
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
   const $ = cheerio.load(await res.text());
   const items: ListedArticle[] = [];
@@ -67,19 +74,41 @@ function newest(): string | undefined {
 }
 
 let watching = false;
+// 섹션 목록을 끝까지 확인했을 때의 피드 값. 중간에 실패하면 갱신하지 않아 다음 확인에서 다시 목록을 본다.
+let feed: Validators = {};
+let blockedUntil = 0;
 
-// 섹션 목록을 확인해 새 기사를 알림으로 기록하고, 각 섹션의 최신 기사를 요약 대기열에 넣는다.
+function pauseForBlock(err: SiteBlockedError): void {
+  blockedUntil = Date.now() + BLOCK_PAUSE_MS;
+  console.error(`watch: ${err.message}; no site requests for ${BLOCK_PAUSE_MS / 60_000} min`);
+}
+
+// 사이트가 바뀌었을 때만(피드 조건부 요청이 304가 아닐 때만) 섹션 목록을 확인해 새 기사를 알림으로 기록하고,
+// 각 섹션의 최신 기사를 요약 대기열에 넣는다. 평소 확인은 304 응답 하나(수백 바이트)로 끝난다.
 async function watchOnce(): Promise<void> {
-  if (watching) return;
+  if (watching || Date.now() < blockedUntil) return;
   watching = true;
   try {
+    let check;
+    try {
+      check = await checkFeed(BASE, feed);
+    } catch (err) {
+      if (err instanceof SiteBlockedError) pauseForBlock(err);
+      else console.error('watch: feed check failed:', err);
+      return;
+    }
+    if (!check.changed) return;
+
     const listed: ListedArticle[] = [];
+    let failures = 0;
     for (const [code, label] of SECTIONS) {
       try {
         const items = await listSection(code, label);
         listed.push(...items);
         for (const item of items.slice(0, Math.max(0, PER_SECTION))) pending.add(item.id);
       } catch (err) {
+        failures++;
+        if (err instanceof SiteBlockedError) { pauseForBlock(err); break; }
         console.error(`watch: listing ${code} failed:`, err);
       }
     }
@@ -88,10 +117,11 @@ async function watchOnce(): Promise<void> {
     if (fresh.length) console.log(`watch: ${fresh.length} new article alerts`);
     // 새 기사는 섹션별 개수 제한과 상관없이 요약해 둔다. 알림을 받고 바로 열어 볼 기사다.
     for (const alert of fresh) if (alert.articleId) pending.add(alert.articleId);
+    if (failures === 0) feed = check.next;
   } finally {
     watching = false;
+    void summarizePending().catch(err => console.error('prefetch failed:', err));
   }
-  void summarizePending().catch(err => console.error('prefetch failed:', err));
 }
 
 export function startWatch(): void {
