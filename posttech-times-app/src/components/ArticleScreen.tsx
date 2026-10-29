@@ -4,8 +4,6 @@ import { fonts } from '@/lib/theme';
 import type { Article } from '@/types/article';
 import PhotoBlock from './PhotoBlock';
 import CatBadge from './CatBadge';
-import SummaryCard from './SummaryCard';
-import { canSummarize } from '@/lib/summarize';
 import { ArrowLeftIcon, FontIcon, BookmarkIcon, ShareIcon, MoonIcon, SunIcon } from './Icons';
 
 interface Props {
@@ -195,8 +193,6 @@ export default function ArticleScreen({ t, article: a, onBack, dark, onToggleDar
               {isBookmarked ? '저장됨' : '스크랩'}
             </button>
           </div>
-
-          {canSummarize(current.id) && <SummaryCard key={current.id} t={t} articleId={current.id} />}
 
           {loadingDetail && (
             <div style={{

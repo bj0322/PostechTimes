@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true,
     },
-    // 속보 알림. OS가 약 15분마다 public/runners/alerts.js의 checkAlerts를 실행한다.
+    // 새 기사 알림. OS가 약 15분마다 public/runners/alerts.js의 checkAlerts를 실행한다.
     // label은 src/lib/alerts.ts의 RUNNER_LABEL, iOS Info.plist의 BGTaskSchedulerPermittedIdentifiers와 같아야 한다.
     BackgroundRunner: {
       label: 'kr.ac.postech.times.alerts',

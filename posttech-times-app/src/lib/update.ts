@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import { SERVER_URL } from './server';
+
+// 새 버전은 이 저장소의 최신 GitHub Release에서 확인한다.
+const REPO = 'bj0322/PostechTimes';
 
 export interface AppUpdate {
   version: string;
@@ -9,11 +11,10 @@ export interface AppUpdate {
   sizeMb: number;
 }
 
-interface LatestApp {
-  version: string;
-  notes: string;
-  apkPath: string;
-  size: number;
+interface LatestRelease {
+  tag_name: string;
+  body: string | null;
+  assets: { name: string; size: number; browser_download_url: string }[];
 }
 
 // "2.10"이 "2.9"보다 크도록 숫자 단위로 비교한다.
@@ -40,17 +41,22 @@ function releaseNotes(body: string): string[] {
 
 // APK로 배포하는 Android 앱만 확인한다. iOS는 앱스토어·TestFlight가 업데이트를 맡는다.
 export async function checkForUpdate(): Promise<AppUpdate | null> {
-  if (!SERVER_URL || Capacitor.getPlatform() !== 'android') return null;
+  if (Capacitor.getPlatform() !== 'android') return null;
 
-  const [{ version }, res] = await Promise.all([App.getInfo(), fetch(`${SERVER_URL}/app/latest`)]);
+  const [{ version }, res] = await Promise.all([
+    App.getInfo(),
+    fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } }),
+  ]);
   if (!res.ok) return null;
-  const latest = (await res.json()) as LatestApp;
-  if (!isNewer(latest.version, version)) return null;
+  const release = (await res.json()) as LatestRelease;
+  const apk = release.assets.find(a => a.name.endsWith('.apk'));
+  const latest = release.tag_name.replace(/^v/, '');
+  if (!apk || !isNewer(latest, version)) return null;
 
   return {
-    version: latest.version,
-    notes: releaseNotes(latest.notes ?? ''),
-    downloadUrl: `${SERVER_URL}${latest.apkPath}`,
-    sizeMb: Math.round((latest.size / 1024 / 1024) * 10) / 10,
+    version: latest,
+    notes: releaseNotes(release.body ?? ''),
+    downloadUrl: apk.browser_download_url,
+    sizeMb: Math.round((apk.size / 1024 / 1024) * 10) / 10,
   };
 }
